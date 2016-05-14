@@ -2,13 +2,19 @@ var express = require('express');
 var validator = require('validator');
 var pgp = require('pg-promise')();
 var router = express.Router();
-var connectionOptions = {
-  host: 'localhost',
-  port: 5432,
-  database: 'url_shortener_db',
-  user: 'postgres',
-  password: 'postgres'
-};
+
+var connectionOptions;
+if(process.env.NODE_ENV) {
+  connectionOptions = process.env.DATABASE_URL;
+} else {
+  connectionOptions = {
+    host: 'localhost',
+    port: 5432,
+    database: 'url_shortener_db',
+    user: 'postgres',
+    password: 'postgres'
+  };
+}
 
 var logError = function(error) {
   console.log("ERROR: ", error);
