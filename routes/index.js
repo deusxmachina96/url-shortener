@@ -38,45 +38,46 @@ router.get("/", function(req, res, next){
 
 // Shortens a valid URL or redirects if a valid short URL is passed.
 // Responds with original and short url or an error, in JSON format.
-router.get("/:value([\\S]+)", function(req, res, next) {
+router.get("/:value([\\S]+)", function (req, res, next) {
 
-  var param = req.params.value;
-  console.log('param: ', param);
-  if(validator.isURL(param, {require_protocol: true})) {
-    db.any("SELECT shortened FROM url_short WHERE original=$1", param)
-        .then(function(data){
-
-          if(data.length > 0) {
-            res.json({original: param, short_url: data[0].shortened});
-          } else {
-            var shortened = randGen();
-            db.none("INSERT INTO url_short(original, shortened) VALUES($1, $2)", [param, shortened])
-                .then(function() {
-                  res.json({original: param, short_url: shortened});
-                })
-                .catch(function(error) {
-                  logError(error);
+    var param = req.params.value;
+    console.log('param: ', param);
+    if (validator.isURL(param, {require_protocol: true})) {
+        db.task(function (t) {
+            return t.any("SELECT shortened FROM url_short WHERE original = $1", param)
+                .then(function (data) {
+                    if (data.length > 0) {
+                        return data;
+                    } else {
+                        var shortened = randGen();
+                        return t.batch([
+                            shortened,
+                            t.none("INSERT INTO url_short(original, shortened) VALUES($1, $2)", [param, shortened])
+                        ]);
+                    }
                 });
-          }
         })
-        .catch(function(error){
-          logError(error);
-        });
-  } else {
-    db.any("SELECT original FROM url_short WHERE shortened=$1", param)
-        .then(function (data) {
+            .then(function (data) {
+                res.json({original: param, short_url: data[0].shortened});
+            })
+            .catch(function (error) {
+                logError(error);
+            });
+    } else {
+        db.any("SELECT original FROM url_short WHERE shortened=$1", param)
+            .then(function (data) {
 
-          if (data.length > 0){
-            res.redirect(data[0].original);
-            console.log("Original URL: ", data[0].original);
-          } else {
-            res.json({error: "Wrong URL format, please make sure both the protocol and address are valid."});
-          }
-        })
-        .catch(function (error) {
-          logError(error);
-        });
-  }
+                if (data.length > 0) {
+                    res.redirect(data[0].original);
+                    console.log("Original URL: ", data[0].original);
+                } else {
+                    res.json({error: "Wrong URL format, please make sure both the protocol and address are valid."});
+                }
+            })
+            .catch(function (error) {
+                logError(error);
+            });
+    }
 });
 
 module.exports = router;
